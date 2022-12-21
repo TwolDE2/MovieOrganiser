@@ -1,14 +1,8 @@
 from __future__ import print_function
 import six
 
-# required methods: Request, urlopen, HTTPError, URLError
-if six.PY3:
-	from urllib.request import urlopen, Request # raises ImportError in Python 2
-	from urllib.error import HTTPError, URLError # raises ImportError in Python 2
-else: # Python 2
-	from urllib2 import urlopen, HTTPError, URLError
-
-import glob, os, base64, re
+import glob, os, re
+from re import sub
 from datetime import date, datetime, timedelta
 from time import localtime, time, strftime, mktime, sleep
 
@@ -22,12 +16,6 @@ from Plugins.Plugin import PluginDescriptor
 from Screens.MessageBox import MessageBox
 from Screens.Screen import Screen
 from Tools.Directories import resolveFilename, SCOPE_CURRENT_PLUGIN, SCOPE_CURRENT_SKIN, SCOPE_METADIR
-
-#remove plugin.py if python 2.* as it will keep overighting the pyo file
-if six.PY2:
-	pyfile = resolveFilename(SCOPE_CURRENT_PLUGIN, "Extensions/MovieOrganisor/plugin.py")
-	if os.path.exists(pyfile):
-		os.remove(pyfile)
 
 config.plugins.movieorganisor = ConfigSubsection()
 config.plugins.movieorganisor.mergenew = ConfigYesNo(default=True)
@@ -44,12 +32,7 @@ config.plugins.movieorganisor.repeattype = ConfigSelection(default="hourly", cho
 	("6hour", _("6 Hours"))
 ])
 
-movieorganisorversion = "3.60"
-new_version = "0"
-new_version_check = time() - 10000
-movieupdatecheckurl = "aHR0cDovLzkxLjEyMS4xOTIuMTgvbW92aWVvcmdhbmlzb3J2ZXJzaW9uLnR4dA=="
-movieupdateurl = "aHR0cDovLzkxLjEyMS4xOTIuMTgvcGx1Z2luLnB5bw=="
-movieorganisoripkbase = "aHR0cDovLzkxLjEyMS4xOTIuMTg="
+movieorganisorversion = "3.61"
 
 def mk_esc(esc_chars):
 	return lambda s: ("").join([ "\\" + c if c in esc_chars else c for c in s ])
@@ -135,7 +118,7 @@ def domovieorganisation():
 				seriesname = name1.split("- ", 1)[0]
 			elif nameext == "stream":
 				seriesname = name1.split(" - ", 2)[1]
-				seriesname = re.sub("S[0-9]* E[0-9]*", "", seriesname)
+				seriesname = sub("S[0-9]* E[0-9]*", "", seriesname)
 			if not config.plugins.movieorganisor.mergenew.value:
 				seriesname = seriesname.replace("New_ ", "")
 				if "_" in seriesname:
@@ -355,36 +338,10 @@ class MovieOrganisorSetupScreen(Screen, ConfigListScreen):
 		Screen.__init__(self, session)
 		Screen.setTitle(self, _("Movie Organisor Setup (version %s)" % movieorganisorversion))
 		timenow = time()
-		cantgetnewversion = 0
-		g64 = base64.b64decode(movieupdatecheckurl)
-		g64 = six.ensure_str(g64)
-		print("[MovieOrganisor][MovieOrganisorSetupScreen] g64url=%s" % g64)
-		if timenow > new_version_check + 10000:
-			new_version_check = time()
-			try:
-				f = urlopen(g64)
-				new_version = f.read().rstrip()
-				new_version1 = six.ensure_str(new_version)
-				print("[MovieOrganiser] new_version = %s" % six.ensure_str(new_version1))
-			except HTTPError as e:
-				cantgetnewversion = 1
-				print("[MovieOrganiser] unable to connect to server to check version")
 		self["key_red"] = StaticText(_("Cancel"))
 		self["key_green"] = StaticText(_("Save"))
 		self["key_yellow"] = StaticText(_("Run now"))
-		self["sig"] = StaticText(_("Plugin by grog68, http://grog68.xyz"))
-		if cantgetnewversion:
-			print("[MovieOrganiser] cannot get new_version")
-			self["new_version"] = StaticText(_("Unable to connect to http://grog68.xyz to check for new version\nPlease check internet connection"))
-			self["key_blue"] = StaticText(_(" "))
-		elif float(new_version) > float(movieorganisorversion):
-			print("[MovieOrganiser] new_version available blue button update= %s" % new_version1)
-			self["key_blue"] = StaticText(_("Update"))
-			self["new_version"] = StaticText(_("Version %s is available, update by pressing the blue button" % str(new_version1)))
-		else:
-			print("[MovieOrganiser] you have new_version available blue button update= %s" % new_version1)
-			self["new_version"] = StaticText(_("You have the latest version (%s) installed. " % str(movieorganisorversion)))
-			self["key_blue"] = StaticText(_("Ver: %s"% movieorganisorversion))
+		self["key_blue"] = StaticText(_(""))
 		self["actions"] = ActionMap(["SetupActions", "ColorActions", "MenuActions"], {
 			"ok": self.keyGo, 
 			"save": self.keyGo, 
@@ -392,7 +349,7 @@ class MovieOrganisorSetupScreen(Screen, ConfigListScreen):
 			"green": self.keyGo, 
 			"red": self.keyCancel, 
 			"yellow": self.keySaveandGo, 
-			"blue": self.keyUpdatePlugin, 
+			"blue": self.keyGo,
 			"menu": self.closeRecursive
 		}, -2)
 		self.onChangedEntry = []
@@ -400,53 +357,6 @@ class MovieOrganisorSetupScreen(Screen, ConfigListScreen):
 		ConfigListScreen.__init__(self, self.list, session=self.session, on_change=self.changedEntry)
 		self.createSetup()
 
-	def keyUpdatePlugin(self):
-		if float(new_version) > float(movieorganisorversion):
-			self.session.openWithCallback(self.ExecuteUpdateIPK, MessageBox, _("Version %s is available" % six.ensure_str(new_version)) + " " + _("Install and reboot?"), MessageBox.TYPE_YESNO)
-		else:
-			self.session.open(MessageBox, _("You have the latest version of MovieOrganisor"), MessageBox.TYPE_INFO, timeout=10)
-
-	def ExecuteUpdateIPK(self, yesorno):
-		global movieupdateurl
-		plugin_type ="py" if six.PY3 else "pyo"
-		if yesorno:
-			IPKurl = base64.b64decode(movieupdateurl)
-			IPKurl = six.ensure_str(IPKurl)
-			if six.PY3:	# python3 is .py Not pyo
-				IPKurl = IPKurl.replace("pyo", "py")
-			response = urlopen(IPKurl)
-			if six.PY2:
-				meta = response.info()
-				serverpluginsize = int(meta.getheaders("Content-Length")[0])
-			else:
-				header = response.getheader("Content-Length")
-				serverpluginsize = int(header)
-			plugindata = response.read()
-			downloadedpluginsize = len(plugindata)
-			print("[MovieOrganiser] downloadedpluginsize=%s" % (downloadedpluginsize))
-						
-			if downloadedpluginsize == serverpluginsize and downloadedpluginsize > 0:
-				# this was changed as resolveFilename(SCOPE_CURRENT_PLUGIN, "Extensions/MovieOrganisor/plugin.%s.bak" did not resolve
-				pluginpy = resolveFilename(SCOPE_CURRENT_PLUGIN, "Extensions/MovieOrganisor/plugin.%s" % plugin_type)
-				pluginbak = pluginpy + ".bak"
-				print("[MovieOrganisor] rename plugin_type to .bak -> %s to %s" % (pluginpy, pluginbak))
-				os.system("mv %s %s" % (pluginpy, pluginbak))
-				print("[MovieOrganisor] output plugin to -> %s" % (pluginpy))
-				output = open(pluginpy, "wb")
-				output.write(plugindata)
-				output.close()
-				newpluginsize = os.path.getsize(pluginpy)
-				if newpluginsize == serverpluginsize:
-					os.system("rm %s" % pluginbak)
-					print("[MovieOrganisor] back up plugin file deleted")
-				else:
-					print("[MovieOrganisor] newpluginsize %d is not the same as serverpluginsize %d so backup file restored " % (newpluginsize, serverpluginsize))
-					os.system("rm %s" % pluginpy)
-					os.system("mv %s %s" % (pluginbak, pluginpy))
-				sleep(3)
-				quitMainloop(3)
-			else:
-				self.session.open(MessageBox, _("There was a problem downloading the update, please try again later"), MessageBox.TYPE_INFO, timeout=10)
 
 	def createSetup(self):
 		self.list = []
