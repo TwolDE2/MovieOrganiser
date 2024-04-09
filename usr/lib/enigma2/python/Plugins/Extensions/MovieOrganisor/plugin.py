@@ -1,7 +1,7 @@
-from __future__ import print_function
-import six
+# Movie Organiser by Grog68 with python 3 only commits by me)
 
-import glob, os, re
+import glob
+import os
 from re import sub
 from datetime import date, datetime, timedelta
 from time import localtime, time, strftime, mktime, sleep
@@ -32,7 +32,7 @@ config.plugins.movieorganisor.repeattype = ConfigSelection(default="hourly", cho
 	("6hour", _("6 Hours"))
 ])
 
-movieorganisorversion = "3.61"
+movieorganisorversion = "3.90"
 
 def mk_esc(esc_chars):
 	return lambda s: ("").join([ "\\" + c if c in esc_chars else c for c in s ])
@@ -61,6 +61,8 @@ def domovieorganisation():
 			try:
 				os.system("mv %s %s" % (os.path.join(path, esc(names)), os.path.join(path, esc(new_name))))
 				print("[MovieOrganisor] Renames %s" % os.path.join(path, esc(names)))
+				if new_name.endswith('meta'):
+					os.system("sed -i 's/New\:\ //g' "+os.path.join(path, esc(new_name)))
 			except Exception:
 				print("[MovieOrganisor]error renaming %s" % os.path.join(path, esc(names)))
 			names = new_name
@@ -336,12 +338,13 @@ class MovieOrganisorSetupScreen(Screen, ConfigListScreen):
 		global new_version1
 		global new_version_check
 		Screen.__init__(self, session)
-		Screen.setTitle(self, _("Movie Organisor Setup (version %s)" % movieorganisorversion))
+		Screen.setTitle(self, _("Movie Organisor Setup (Final version)"))
 		timenow = time()
 		self["key_red"] = StaticText(_("Cancel"))
 		self["key_green"] = StaticText(_("Save"))
 		self["key_yellow"] = StaticText(_("Run now"))
 		self["key_blue"] = StaticText(_(""))
+		self["sig"] = StaticText(_("Plugin by grog68, http://grog68.xyz"))
 		self["actions"] = ActionMap(["SetupActions", "ColorActions", "MenuActions"], {
 			"ok": self.keyGo, 
 			"save": self.keyGo, 
@@ -410,6 +413,6 @@ def main(session, **kwargs):
 
 
 def Plugins(**kwargs):
-	plist = [PluginDescriptor(name=_("Movie Organisor"), description=_("Organise your series recordings into folders"), where=PluginDescriptor.WHERE_PLUGINMENU, fnc=main)]
-	plist.append(PluginDescriptor(name="Movie Organisor", description="Organise Series recordings into folders", where=PluginDescriptor.WHERE_SESSIONSTART, fnc=MovieOrganisorautostart))
+	plist = [PluginDescriptor(name=_("Movie Organisor"), description=_("Organise your series recordings into folders"), icon='plugin.png', where=PluginDescriptor.WHERE_PLUGINMENU, fnc=main)]
+	plist.append(PluginDescriptor(name="Movie Organisor", description="Organise your series recordings into folders", where=PluginDescriptor.WHERE_SESSIONSTART, fnc=MovieOrganisorautostart))
 	return plist
