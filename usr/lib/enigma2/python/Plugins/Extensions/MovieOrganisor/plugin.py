@@ -32,7 +32,7 @@ config.plugins.movieorganisor.repeattype = ConfigSelection(default="hourly", cho
 	("6hour", _("6 Hours"))
 ])
 
-movieorganisorversion = "3.90"
+movieorganisorversion = "3.99"
 
 def mk_esc(esc_chars):
 	return lambda s: ("").join([ "\\" + c if c in esc_chars else c for c in s ])
@@ -344,7 +344,7 @@ class MovieOrganisorSetupScreen(Screen, ConfigListScreen):
 		self["key_green"] = StaticText(_("Save"))
 		self["key_yellow"] = StaticText(_("Run now"))
 		self["key_blue"] = StaticText(_(""))
-		self["sig"] = StaticText(_("Plugin by grog68, http://grog68.xyz"))
+		self["sig"] = StaticText(_("Plugin by grog68"))
 		self["actions"] = ActionMap(["SetupActions", "ColorActions", "MenuActions"], {
 			"ok": self.keyGo, 
 			"save": self.keyGo, 
